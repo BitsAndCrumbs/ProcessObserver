@@ -1,0 +1,4 @@
+# Use LLD linker via GCC's -fuse-ld=lld flag.
+# GCC finds system libraries; LLD links without ordinal limits.
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
