@@ -18,7 +18,15 @@
 
 ---
 
-## 📖 What is ProcessObserver?
+## � Current Release
+
+**v0.9.0** — Windows x64 installer:
+
+[Download ProcessObserver v0.9.0 (MSI)](https://github.com/BitsAndCrumbs/ProcessObserver/releases/download/v0.9.0/ProcessObserver_0.9.0_x64_en-US.msi)
+
+---
+
+## �📖 What is ProcessObserver?
 
 **ProcessObserver** is a native Windows desktop application that watches CPU usage, memory (working set), disk I/O and network activity of any running process — in real time.
 
