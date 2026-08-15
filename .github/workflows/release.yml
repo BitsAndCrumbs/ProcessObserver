@@ -1,0 +1,89 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-msi:
+    name: Build MSI and attach to GitHub Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref }}" -replace '^refs/tags/', '' -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+') {
+            Write-Error "Tag must match v*.*.* (got: ${{ github.ref }})"
+            exit 1
+          }
+          Write-Host "Releasing version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Sync version across manifests
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+
+          # Frontend package manifest
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          $pkg.version = $version
+          $pkg | ConvertTo-Json -Depth 32 | Set-Content package.json -NoNewline -Encoding utf8
+
+          # Tauri config (drives the MSI ProductVersion)
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.version = $version
+          $conf | ConvertTo-Json -Depth 32 | Set-Content src-tauri/tauri.conf.json -NoNewline -Encoding utf8
+
+          # Rust crate manifest ([package] section only, so dependency versions are untouched)
+          $cargo = Get-Content src-tauri/Cargo.toml -Raw
+          $cargo = [regex]::Replace(
+            $cargo,
+            '(?s)(\[package\][^\[]*?\nversion\s*=\s*")[^"]*(")',
+            { param($m) $m.Groups[1].Value + $version + $m.Groups[2].Value }
+          )
+          Set-Content src-tauri/Cargo.toml -Value $cargo -NoNewline -Encoding utf8
+
+          Write-Host "package.json     -> $((Get-Content package.json -Raw | ConvertFrom-Json).version)"
+          Write-Host "tauri.conf.json  -> $((Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version)"
+
+      - name: Build MSI
+        shell: pwsh
+        run: npm run tauri build -- --bundles msi
+
+      - name: Attach MSI to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/msi/*.msi
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

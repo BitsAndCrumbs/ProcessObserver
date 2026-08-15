@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+
+# Tauri generated schemas (regenerated on build/dev)
+src-tauri/gen/schemas/
+sr-c-tauri/target/debug/bundle/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
